@@ -845,14 +845,14 @@
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Mode Eksekusi Saat Ini</label>
                 <select id="setting-mode-select" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
                   <option value="preview">Mode Preview (Data Dummy Cepat)</option>
-                  <option value="production">Mode Production (Google Apps Script API)</option>
+                  <option value="production" selected>Mode Production (Google Apps Script API)</option>
                 </select>
                 <p class="text-[11px] text-slate-400 mt-1">Gunakan mode preview untuk demo, atau production untuk sinkronisasi Google Sheets.</p>
               </div>
 
               <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">URL Web App Google Apps Script (GAS_URL)</label>
-                <input type="text" id="setting-gas-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <input type="text" id="setting-gas-url" value="https://script.google.com/macros/s/AKfycbw4dOBdA-6issw6Bd1lZcgYjneufV6r_VAY3KU0k2mKu8zY9jIIS9lIfCJPauVfiuvl/exec" placeholder="https://script.google.com/macros/s/AKfycb.../exec" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono text-[11px]">
                 <p class="text-[11px] text-slate-400 mt-1">Tempelkan URL deployment eksekusi web app Google Apps Script Anda di sini.</p>
               </div>
             </div>
@@ -1096,8 +1096,8 @@
     // ==========================================
     // true = Mode Preview menggunakan data dummy
     // false = Mode Production menggunakan GAS API
-    let IS_PREVIEW = true;
-    let GAS_URL = "https://script.google.com/macros/s/AKfycbx_SAMPLE_DEPLOYMENT_URL/exec";
+    let IS_PREVIEW = false;
+    let GAS_URL = "https://script.google.com/macros/s/AKfycbw4dOBdA-6issw6Bd1lZcgYjneufV6r_VAY3KU0k2mKu8zY9jIIS9lIfCJPauVfiuvl/exec";
 
     // ==========================================
     // DATABASE STATE (DUMMY IDENTIK DENGAN GAMBAR)
@@ -1155,6 +1155,11 @@
       initSalesChart();
       initCategoryChart();
       populateSelectOptions();
+      
+      // Sinkronisasi data otomatis saat mode production aktif
+      if (!IS_PREVIEW) {
+        loadDataFromGAS();
+      }
     });
 
     // ==========================================
@@ -2025,6 +2030,30 @@
         return;
       }
       showToast(`Profil toko "${name}" berhasil diperbarui.`, 'success');
+    }
+
+    async function loadDataFromGAS() {
+      if (!GAS_URL || GAS_URL.includes("SAMPLE_DEPLOYMENT_URL")) return;
+      try {
+        const response = await fetch(`${GAS_URL}?action=getDashboardData`);
+        const result = await response.json();
+        if (result && result.status === 'success' && result.summary) {
+          state.summary.totalTransaksi = result.summary.totalTransaksi || state.summary.totalTransaksi;
+          state.summary.totalPendapatan = result.summary.totalPendapatan || state.summary.totalPendapatan;
+          state.summary.produkTerjual = result.summary.produkTerjual || state.summary.produkTerjual;
+          
+          if (Array.isArray(result.recentTransactions) && result.recentTransactions.length > 0) {
+            state.transactions = result.recentTransactions;
+          }
+          renderSummaryCards();
+          renderRecentTransactionsTable();
+          renderAllTransactionsView();
+          renderLaporanFinancials();
+          showToast('Data berhasil disinkronkan dari Google Sheets!', 'success');
+        }
+      } catch (err) {
+        console.warn('Gagal memuat data dari GAS:', err);
+      }
     }
 
     // ==========================================
